@@ -1,0 +1,18 @@
+[project]
+name = "sd-meh"
+version = "0.1.1"
+authors = [
+  { name="s1dlx" },
+]
+description = "Merging Execution Helper"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/s1dlx/meh"
+"Bug Tracker" = "https://github.com/s1dlx/meh/issues"

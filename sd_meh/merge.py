@@ -69,7 +69,7 @@ def merge_models(
     bases: Dict,
     merge_mode: str,
     precision: int = 16,
-) -> None:
+) -> dict:
     thetas = {k: load_sd_model(Path(m)) for k, m in models.items()}
 
     for key in tqdm(thetas["model_a"].keys(), desc="stage 1"):
