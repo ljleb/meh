@@ -3,6 +3,8 @@ Makefile
 **/__pycache__/*
 dist/*
 *.toml
+!pyproject.toml
 **/*.png
 *.safetensors
 *.ckpt
+.idea/
