@@ -10,7 +10,7 @@ class SDModel:
     model_path: os.PathLike
     device: str
 
-    def load_model(self):
+    def load_model(self) -> dict:
         print(f"loading: {self.model_path}")
         if self.model_path.suffix == ".safetensors":
             ckpt = safetensors.torch.load_file(

@@ -1,7 +1,7 @@
 import os
 import re
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 
 import safetensors.torch
 import torch
@@ -59,8 +59,14 @@ def fix_model(model: Dict) -> Dict:
     return fix_clip(model)
 
 
-def load_sd_model(model_path: os.PathLike, device: str = "cpu") -> SDModel:
-    return SDModel(model_path, device).load_model()
+def load_sd_model(model: os.PathLike | str | dict, device: str = "cpu") -> dict:
+    if isinstance(model, dict):
+        return model
+
+    if isinstance(model, str):
+        model = Path(model)
+
+    return SDModel(model, device).load_model()
 
 
 def merge_models(
@@ -69,8 +75,8 @@ def merge_models(
     bases: Dict,
     merge_mode: str,
     precision: int = 16,
-) -> None:
-    thetas = {k: load_sd_model(Path(m)) for k, m in models.items()}
+) -> dict:
+    thetas = {k: load_sd_model(m) for k, m in models.items()}
 
     for key in tqdm(thetas["model_a"].keys(), desc="stage 1"):
         if result := merge_key(
@@ -101,7 +107,7 @@ def merge_key(
     bases: Dict,
     merge_mode: str,
     precision: int = 16,
-) -> Tuple[str, Dict]:
+) -> Optional[Tuple[str, Dict]]:
     if KEY_POSITION_IDS in key:
         return
 
@@ -144,7 +150,7 @@ def merge_key(
         return (key, merged_key)
 
 
-def merge(current_bases: Dict, thetas: Dict, key: str, merge_mode: str) -> Dict:
+def merge(current_bases: Dict, thetas: Dict, key: str, merge_mode: str) -> torch.Tensor:
     t0 = thetas["model_a"][key]
     t1 = thetas["model_b"][key]
     alpha = current_bases["alpha"]
@@ -172,8 +178,54 @@ def merge(current_bases: Dict, thetas: Dict, key: str, merge_mode: str) -> Dict:
     t2 = thetas["model_c"][key]
     if merge_mode == "add_difference":
         return t0 + alpha * (t1 - t2)
+    elif merge_mode == "clip_add_difference":
+        res = t0 + alpha * (t1 - t2)
+        threshold = torch.maximum(torch.abs(t0), torch.abs(t1))
+        return torch.minimum(torch.maximum(res, -threshold), threshold)
+    elif merge_mode == "sigmoid_add_difference":
+        dif_res = t0 + alpha * (t1 - t2)
+        threshold = torch.maximum(torch.abs(t0), torch.abs(t1))
+        return (torch.sigmoid(dif_res / threshold * 4) * 2 - 1) * threshold
+    elif merge_mode == "tanh_add_difference":
+        res = t0 + alpha * (t1 - t2)
+        threshold = torch.maximum(torch.abs(t0), torch.abs(t1))
+        res = torch.minimum(torch.maximum(res, -threshold * 1.5), threshold * 1.5)
+        return torch.tanh(torch.tan(res / threshold)) * threshold
+    elif merge_mode == "softplus_add_difference":
+        #soft_plus = torch.nn.Softplus(beta=8)
+        soft_plus = torch.nn.Softplus(beta=32, threshold=8)
+        threshold = torch.maximum(torch.abs(t0), torch.abs(t1))
+        res = torch.div(t0 + alpha * (t1 - t2), torch.maximum(threshold, torch.full_like(threshold, EPSILON)))
+        return torch.mul(soft_plus(1 + res) - soft_plus(1 - res) - res, threshold)
+    elif merge_mode == "relative_softplus":
+        #soft_plus = torch.nn.Softplus(beta=8)
+        #soft_plus = torch.nn.Softplus(beta=32, threshold=8)
+        soft_plus = torch.nn.Softplus(beta=16, threshold=16)
+        threshold = torch.maximum(torch.abs(t0), torch.abs(t1))
+        res = t0 + alpha * (t1 - t2)
+        hard_clip = torch.minimum(torch.maximum(res, -threshold), threshold)
+        res /= torch.maximum(threshold, torch.full_like(threshold, EPSILON))
+        soft_clip = (soft_plus(1 + res) - soft_plus(1 - res) - res) * threshold
+        del res
+        similarity = (t0 * t1 / threshold + 1) / 2
+        return (1 - similarity) * hard_clip + similarity * soft_clip
+    if merge_mode == "min_max_sum":
+        signs = t0 * t1 / torch.abs(t0 * t1)
+        min_threshold = torch.minimum(torch.abs(t0), torch.abs(t1)) * signs
+        max_threshold = torch.maximum(torch.abs(t0), torch.abs(t1)) * signs
+        return torch.nan_to_num((min_threshold + max_threshold) / 2)
     beta = current_bases["beta"]
-    if merge_mode == "sum_twice":
+    if merge_mode == "weighted_sum_difference":
+        threshold = torch.maximum(torch.abs(t0), torch.abs(t1))
+        similarity = ((t0 * t1 / threshold ** 2) + 1) / 2 * beta
+        similarity = torch.nan_to_num(similarity, nan=beta)
+        # similarity *= similarity
+        res = (1 - alpha * similarity / 2) * t0 +\
+              (1 - similarity / 2) * alpha * t1 +\
+              (similarity - 1) * alpha * t2
+        res_clip = torch.minimum(torch.maximum(res, -threshold), threshold)
+        return res_clip
+    elif merge_mode == "sum_twice":
         return (1 - beta) * ((1 - alpha) * t0 + alpha * t1) + beta * t2
     elif merge_mode == "triple_sum":
         return (1 - alpha - beta) * t0 + alpha * t1 + beta * t2
