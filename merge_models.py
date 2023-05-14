@@ -24,11 +24,6 @@ def compute_weights(weights, base):
         [
             "weighted_sum",
             "weighted_sum_difference",
-            "min_max_sum",
-            "sigmoid_add_difference",
-            "tanh_add_difference",
-            "softplus_add_difference",
-            "relative_softplus",
             "add_difference",
             "weighted_subtraction",
             "sum_twice",
