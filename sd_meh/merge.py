@@ -75,7 +75,7 @@ def merge_models(
     bases: Dict,
     merge_mode: str,
     precision: int = 16,
-    max_clip: bool = False,
+    weights_clip: bool = False,
 ) -> dict:
     thetas = {k: load_sd_model(m) for k, m in models.items()}
 
@@ -87,7 +87,7 @@ def merge_models(
             bases,
             merge_mode,
             precision,
-            max_clip,
+            weights_clip,
         ):
             thetas["model_a"][key] = result[1]
 
@@ -109,7 +109,7 @@ def merge_key(
     bases: Dict,
     merge_mode: str,
     precision: int = 16,
-    max_clip: bool = False,
+    weights_clip: bool = False,
 ) -> Optional[Tuple[str, Dict]]:
     if KEY_POSITION_IDS in key:
         return
@@ -147,7 +147,7 @@ def merge_key(
 
         merged_key = merge(current_bases, thetas, key, merge_mode)
 
-        if max_clip:
+        if weights_clip:
             threshold = torch.maximum(torch.abs(thetas["model_a"][key]), torch.abs(thetas["model_b"][key]))
             merged_key = torch.minimum(torch.maximum(merged_key, -threshold), threshold)
 
