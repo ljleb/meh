@@ -24,15 +24,22 @@ def compute_weights(weights, base):
         [
             "weighted_sum",
             "add_difference",
+            "redistribute",
+            "from_linear",
+            "add_similarity",
+            "distribution_softclip",
+            "softdist",
+            "similarity_add_difference",
             "weighted_subtraction",
             "sum_twice",
             "triple_sum",
             "tensor_sum",
+            "clip",
         ],
         case_sensitive=False,
     ),
 )
-@click.option("-wc", "--weights_clip", "weights_clip", is_flag=True)
+@click.option("-wc", "--weights_clip", "weights_clip", type=float, is_flag=False, flag_value=0., default=None)
 @click.option("-p", "--precision", "precision", type=int, default=16)
 @click.option("-o", "--output_path", "output_path", type=str, default="model_out")
 @click.option(
