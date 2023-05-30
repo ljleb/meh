@@ -25,6 +25,8 @@ def compute_weights(weights, base):
             "weighted_sum",
             "add_difference",
             "redistribute",
+            "edit_dist",
+            "sq_mean",
             "from_linear",
             "add_similarity",
             "distribution_softclip",

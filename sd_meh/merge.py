@@ -4,7 +4,9 @@ import re
 from pathlib import Path
 from typing import Dict, Tuple, Optional
 
+import numpy
 import safetensors.torch
+import scipy
 import torch
 from tqdm import tqdm
 
@@ -289,14 +291,23 @@ def merge(current_bases: Dict, thetas: Dict, key: str, merge_mode: str) -> torch
     elif merge_mode == "max_sum":
         max_threshold = torch.copysign(torch.maximum(torch.abs(t0 - t2), torch.abs(t1 - t2)), t0 + t1 - 2 * t2)
         return t2 + max_threshold
+    elif merge_mode == "sq_mean":
+        tx = t0 + t1 - t2
+        mean = torch.mean(tx)
+        return (tx - mean) ** 2 + mean
+    elif merge_mode == "edit_dist":
+        t0_values, t0_indices = torch.sort(torch.flatten(t0.cuda()))
+        t1_indices = torch.argsort(torch.flatten(t1.cuda()), stable=True)
+        redistributed_t0_values = torch.gather(t0_values, 0, t1_indices)
+        return redistributed_t0_values.reshape(t0.shape)
     threshold = torch.maximum(torch.abs(t0), torch.abs(t1))
     beta = current_bases["beta"]
     if merge_mode == "similarity_add_difference":
         res_0 = t0 + t1 - t2
         res_1 = (t0 + t1) / 2
 
-        similarity = ((t0 * t1 / threshold ** 2) + 1) / 2 * beta
-        similarity = torch.nan_to_num(similarity, nan=beta)
+        similarity = ((t0 * t1 / threshold ** 2) + 1) / 2
+        similarity = torch.nan_to_num(similarity * beta, nan=beta)
         return (1 - similarity) * res_0 + similarity * res_1
     elif merge_mode == "redistribute":
         t0_values = torch.msort(torch.flatten(t0))
