@@ -10,10 +10,11 @@ __all__ = [
     "triple_sum",
     "transmogrify_distribution",
     "similarity_add_difference",
+    "slerp",
 ]
 
 
-EPSILON = 1e-10  # Define a small constant EPSILON to prevent division by zero
+EPSILON = 1e-5  # Define a small constant EPSILON to prevent division by zero
 
 
 def weighted_sum(a: Tensor, b: Tensor, alpha: float, **kwargs) -> Tensor:
@@ -77,3 +78,28 @@ def similarity_add_difference(
     ab_diff = a + alpha * (b - c)
     ab_sum = (1 - alpha / 2) * a + (alpha / 2) * b
     return (1 - similarity) * ab_diff + similarity * ab_sum
+
+
+def slerp(a: Tensor, b: Tensor, c: Tensor, alpha: float, beta: float, **kwargs) -> Tensor:
+    x_sum = (1 - alpha) * a + alpha * b
+    if (a == c).all() or (b == c).all():
+        return x_sum
+
+    try:
+        a_diff = a - c
+        b_diff = b - c
+        a_diff_norm = a_diff / torch.linalg.norm(a_diff)
+        b_diff_norm = b_diff / torch.linalg.norm(b_diff)
+
+        omega = torch.arccos(torch.clamp(torch.sum(a_diff_norm * b_diff_norm), EPSILON - 1.0, 1.0 - EPSILON))
+        base = torch.sin(omega)
+
+        x_slerp = a_diff_norm * torch.sin((1 - alpha) * omega) / base
+        x_slerp += b_diff_norm * torch.sin(alpha * omega) / base
+
+        norm = (1 - alpha) * torch.linalg.norm(a_diff) + alpha * torch.linalg.norm(b_diff)
+        x_slerp = x_slerp * norm + c
+        res = (1 - beta) * x_sum + beta * x_slerp
+        return res
+    except RuntimeError:
+        return slerp(a.float(), b.float(), c.float(), alpha, beta, **kwargs)
