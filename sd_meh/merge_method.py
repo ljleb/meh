@@ -25,7 +25,7 @@ class MergeMethod:
     spaces: Set[MergeSpace]
 
     def __call__(self, hyperparams: Dict, thetas: Dict, theta_key: str):
-        callback_kwargs = {[k[k.find("_")+1:]]: v[theta_key] for k, v in thetas}
+        callback_kwargs = {[k[k.find("_") + 1:]]: v[theta_key] for k, v in thetas}
         callback_kwargs.update(hyperparams)
         return self.callback(**callback_kwargs)
 
