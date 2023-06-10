@@ -59,9 +59,7 @@ def triple_sum(
 
 
 @merge_method(MergeSpace.DIFFERENCE)
-def euclidean_add_difference(
-    a: Tensor, b: Tensor, alpha: float, **kwargs
-) -> Tensor:
+def euclidean_add_difference(a: Tensor, b: Tensor, alpha: float, **kwargs) -> Tensor:
     a_diff = a.float()
     b_diff = b.float()
     a_diff /= torch.linalg.norm(a_diff)
@@ -152,9 +150,7 @@ def similarity_add_difference(
 
 
 @merge_method(MergeSpace.DISTRIBUTION)
-def distribution_crossover(
-    a: Tensor, b: Tensor, alpha: float, beta: float, **kwargs
-):
+def distribution_crossover(a: Tensor, b: Tensor, alpha: float, beta: float, **kwargs):
     if a.shape == ():
         return alpha * a + (1 - alpha) * b
 
