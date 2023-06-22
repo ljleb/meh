@@ -209,3 +209,9 @@ def filter_top_k(a: Tensor, k: float):
     k_value, _ = torch.kthvalue(torch.abs(a.flatten()).float(), k)
     top_k_filter = (torch.abs(a) >= k_value).float()
     return a * top_k_filter
+
+
+def logarithmic_add_difference(
+    a: Tensor, b: Tensor, alpha: float, **kwargs
+) -> Tensor:
+    return torch.log(weighted_sum(torch.exp(a.float()), torch.exp(b.float()), alpha))
