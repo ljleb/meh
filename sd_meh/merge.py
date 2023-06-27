@@ -245,6 +245,8 @@ def simple_merge(
 
     log_vram("after stage 1")
 
+    print(sum(total_keys.values()))
+
     for key in tqdm(thetas["model_b"].keys(), desc="stage 2"):
         if KEY_POSITION_IDS in key:
             continue
@@ -346,6 +348,9 @@ def simple_merge_key(progress, key, thetas, *args, **kwargs):
         progress.update()
 
 
+total_keys = {}
+
+
 def merge_key(
     key: str,
     thetas: Dict,
@@ -373,23 +378,71 @@ def merge_key(
         if "model.diffusion_model." in key:
             weight_index = -1
 
-            re_inp = re.compile(r"\.input_blocks\.(\d+)\.")  # 12
-            re_mid = re.compile(r"\.middle_block\.(\d+)\.")  # 1
-            re_out = re.compile(r"\.output_blocks\.(\d+)\.")  # 12
-
             if "time_embed" in key:
                 weight_index = 0  # before input blocks
-            elif ".out." in key:
-                weight_index = NUM_TOTAL_BLOCKS - 1  # after output blocks
-            elif m := re_inp.search(key):
-                weight_index = int(m.groups()[0])
-            elif re_mid.search(key):
-                weight_index = NUM_INPUT_BLOCKS
-            elif m := re_out.search(key):
-                weight_index = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + int(m.groups()[0])
 
-            if weight_index >= NUM_TOTAL_BLOCKS:
+            elif ".in_layers.0." in key:
+                weight_index = 1
+            elif ".in_layers.2." in key:
+                weight_index = 2
+            elif ".emb_layers." in key:
+                weight_index = 3
+            elif ".out_layers.0" in key:
+                weight_index = 4
+            elif ".out_layers.3" in key:
+                weight_index = 5
+
+            elif ".skip_connection." in key:
+                weight_index = 6
+
+            elif ".1.norm." in key:
+                weight_index = 7
+            elif ".1.proj_in." in key:
+                weight_index = 8
+            elif ".transformer_blocks.0.attn1.to_q." in key:
+                weight_index = 9
+            elif ".transformer_blocks.0.attn1.to_k." in key:
+                weight_index = 10
+            elif ".transformer_blocks.0.attn1.to_v." in key:
+                weight_index = 11
+            elif ".transformer_blocks.0.attn1.to_out." in key:
+                weight_index = 12
+            elif ".transformer_blocks.0.norm1." in key:
+                weight_index = 13
+            elif ".transformer_blocks.0.attn2.to_q." in key:
+                weight_index = 14
+            elif ".transformer_blocks.0.attn2.to_k." in key:
+                weight_index = 15
+            elif ".transformer_blocks.0.attn2.to_v." in key:
+                weight_index = 16
+            elif ".transformer_blocks.0.attn2.to_out." in key:
+                weight_index = 17
+            elif ".transformer_blocks.0.norm2." in key:
+                weight_index = 18
+            elif ".transformer_blocks.0.ff.net.0." in key:
+                weight_index = 19
+            elif ".transformer_blocks.0.ff.net.2." in key:
+                weight_index = 20
+            elif ".transformer_blocks.0.norm3." in key:
+                weight_index = 21
+            elif ".1.proj_out." in key:
+                weight_index = 22
+
+            elif ".op." in key or ".input_blocks.0." in key:
+                weight_index = 23
+
+            elif ".conv." in key:
+                weight_index = 24
+
+            elif ".out.0." in key:
+                weight_index = 25
+            elif ".out.1." in key:
+                weight_index = 26
+
+            if weight_index > 26:
                 raise ValueError(f"illegal block index {key}")
+
+            total_keys[weight_index] = total_keys.get(weight_index, 0) + 1
 
             if weight_index >= 0:
                 current_bases = {k: w[weight_index] for k, w in weights.items()}
@@ -401,6 +454,9 @@ def merge_key(
 
         merge_args = get_merge_method_args(current_bases, thetas, key, work_device)
         merged_key = merge_method(**merge_args).to(storage_device)
+
+        with torch.no_grad():
+            torch.cuda.empty_cache()
 
         if weights_clip:
             t0 = thetas["model_a"][key]

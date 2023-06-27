@@ -16,10 +16,10 @@ beta_methods = [
 
 def compute_weights(weights, base):
     if not weights:
-        return [base] * NUM_TOTAL_BLOCKS
+        return [base] * 27
     if "," in weights:
         w_alpha = list(map(float, weights.split(",")))
-        if len(w_alpha) == NUM_TOTAL_BLOCKS:
+        if len(w_alpha) == 27:
             return w_alpha
 
 

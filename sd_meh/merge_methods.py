@@ -212,6 +212,8 @@ def filter_top_k(a: Tensor, k: float):
 
 
 def logarithmic_add_difference(
-    a: Tensor, b: Tensor, alpha: float, **kwargs
+    a: Tensor, b: Tensor, alpha: float, beta: float, **kwargs
 ) -> Tensor:
-    return torch.log(weighted_sum(torch.exp(a.float()), torch.exp(b.float()), alpha))
+    if beta == 1:
+        return weighted_sum(a, b, alpha)
+    return torch.log(weighted_sum(torch.pow(beta, a.float()), torch.pow(beta, b.float()), alpha)) / math.log(beta)
