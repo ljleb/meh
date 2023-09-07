@@ -215,8 +215,8 @@ def filter_top_k(a: Tensor, k: float):
 def complex_rotate(a: Tensor, b: Tensor, alpha: float, **kwargs):
     a = a.float()
     b = b.float()
-    rotated_a = torch.e ** (1j * torch.pi * a / torch.norm(a))
-    rotated_b = torch.e ** (1j * torch.pi * b / torch.norm(b))
+    rotated_a = torch.e ** (1j * torch.pi / torch.norm(a) * a)
+    rotated_b = torch.e ** (1j * torch.pi / torch.norm(b) * b)
     rotated_merge = (1 - alpha) * rotated_a + alpha * rotated_b
-    norm = (torch.norm(a) + torch.norm(b)) / 2
+    norm = (1 - alpha) * torch.norm(a) + alpha * torch.norm(b)
     return torch.angle(rotated_merge) / torch.pi * norm
