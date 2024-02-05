@@ -169,18 +169,77 @@ def distribution_crossover(
     a_dft = torch.fft.rfft(a_dist.float())
     b_dft = torch.fft.rfft(b_dist.float())
 
-    dft_filter = torch.arange(0, torch.numel(a_dft), device=a_dft.device).float()
-    dft_filter /= torch.numel(a_dft)
-    if beta > EPSILON:
-        dft_filter = (dft_filter - alpha) / beta + 1 / 2
-        dft_filter = torch.clamp(dft_filter, 0.0, 1.0)
-    else:
-        dft_filter = (dft_filter >= alpha).float()
+    dft_filter = create_filter((torch.numel(a_dft),), alpha, beta, device=a.device)
 
     x_dft = (1 - dft_filter) * a_dft + dft_filter * b_dft
     x_dist = torch.fft.irfft(x_dft, a_dist.shape[0])
     x_values = torch.gather(x_dist, 0, torch.argsort(c_indices))
     return x_values.reshape_as(a)
+
+
+def crossover(
+    a: Tensor, b: Tensor, alpha: float, beta: float, **kwargs
+):
+    # if alpha == 0 and beta == 0:
+    #     return a
+
+    if len(a.shape) == 0 or torch.allclose(a.half(), b.half()):
+        return weighted_sum(a, b, beta)
+
+    a_dft = torch.fft.rfftn(a.float())
+    b_dft = torch.fft.rfftn(b.float())
+
+    dft_filter = create_filter(a.shape, alpha, beta, device=a.device)
+
+    x_dft = (1 - dft_filter) * a_dft + dft_filter * b_dft
+    x = torch.fft.irfftn(x_dft, s=a.shape)
+    return x.to(a.dtype)
+
+
+def create_filter(shape, alpha: float, beta: float, device=None):
+    # Generate linear indices for each dimension
+    gradients = [
+        torch.linspace(0, 1, s, device=device)**2
+        for s in shape[:-1]
+    ] + [torch.linspace(0, 1, shape[-1] // 2 + 1, device=device)**2]
+
+    if len(shape) > 1:
+        grids = torch.meshgrid(*gradients, indexing='ij')
+        linear_scale = torch.sqrt(torch.sum(torch.stack(grids), dim=0))
+    else:
+        linear_scale = gradients[0]
+
+    if beta < EPSILON:
+        return (linear_scale <= alpha).float()
+
+    b = math.pi * min(beta, 1-beta) / 2
+    d1 = math.sin(b)
+    d2 = math.cos(b)
+    d3 = d1 + d2
+
+    p1_d1 = (1 - math.sqrt(2) * math.cos(2*b + math.pi/4)) / 4
+    p2_d2 = (math.sin(2*b) + 3*math.cos(2*b) + 1) / 4
+    p3_d3 = (math.sqrt(2) * math.sin(2*b + math.pi/4) + 1) / 2
+
+    def cot(x):
+        return 1/math.tan(x)
+
+    a = min(max(1 - alpha, 0.0), 1.0) * p3_d3
+    if a < p1_d1:
+        a = math.sqrt(2 * a / (cot(b) + 1))
+    elif a < p2_d2:
+        a = (math.sqrt(2)*(4*a + 1) - 2*math.cos(2*b + math.pi/4)) / (8*math.sin(b + math.pi / 4))
+    else:
+        b_sin2 = math.sin(2*b)
+        a = (b_sin2 + 1)/d3 - math.sqrt((a*(math.cos(2*b) - 1) + (b_sin2 - a + 1)*b_sin2) / (b_sin2 + 1))
+    a /= d3
+
+    # Apply alpha and beta
+    b_tan = cot(b) if beta <= 0.5 else math.tan(b)
+    adjusted_filter = linear_scale * b_tan - a * b_tan - a + 1
+    adjusted_filter = torch.nan_to_num(torch.clamp(adjusted_filter, 0.0, 1.0))
+
+    return adjusted_filter
 
 
 def ties_add_difference(

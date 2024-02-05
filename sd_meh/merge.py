@@ -2,6 +2,7 @@ import gc
 import logging
 import os
 import re
+import traceback
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
@@ -419,7 +420,10 @@ def merge_key(
             else:
                 merged_key = merge_args["b"]
         else:
-            merged_key = merge_method(**merge_args).to(device)
+            try:
+                merged_key = merge_method(**merge_args).to(device)
+            except:
+                traceback.print_exc()
 
         if weights_clip:
             merged_key = clip_weights_key(thetas, merged_key, key)
