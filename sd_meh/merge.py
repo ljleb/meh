@@ -379,6 +379,9 @@ def merge_key(
         if key not in theta.keys():
             return
 
+    if "first_stage_model" in key:
+        return
+
     if "model" in key:
         current_bases = bases
 
