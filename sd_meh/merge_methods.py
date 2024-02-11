@@ -216,11 +216,11 @@ def create_filter(shape, alpha: float, beta: float, steps=100, precision=EPSILON
     k = 8
     # alpha = 1 - ((k+1)**(1 - alpha) - 1) / k
 
-    phi_alpha = alpha * math.sqrt(len(shape))
+    phi_alpha = alpha
     dft_filter = mesh
     for step in range(steps):
         if beta < EPSILON:
-            dft_filter = (mesh >= math.sqrt(len(shape)) - phi_alpha).float()
+            dft_filter = (mesh > 1 - phi_alpha).float()
         else:
             cot_b = 1 / math.tan(math.pi * beta / 2)
             dft_filter = torch.clamp(mesh*cot_b + phi_alpha*cot_b + phi_alpha - cot_b, 0, 1)
